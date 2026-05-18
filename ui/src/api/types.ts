@@ -287,6 +287,7 @@ export interface InstanceConfig {
   entrypoint?: string[]
   command?: string[]
   extra_args?: string[]
+  benchmark_extra_args?: string[]
   pull_policy: string
   restart?: string
   environment?: Record<string, string>

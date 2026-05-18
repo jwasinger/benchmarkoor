@@ -779,6 +779,10 @@ type ClientDefaults struct {
 	CheckpointRestoreStrategyOptions *CheckpointRestoreStrategyOptions `yaml:"checkpoint_restore_strategy_options,omitempty" mapstructure:"checkpoint_restore_strategy_options"`
 	OpcodeExtraction                 *OpcodeExtractionConfig           `yaml:"opcode_extraction,omitempty" mapstructure:"opcode_extraction"`
 	Metadata                         MetadataConfig                    `yaml:"metadata,omitempty" mapstructure:"metadata"`
+	// BenchmarkExtraArgs are appended to the client command only when the
+	// client container is started for the benchmark phase. They are NOT
+	// applied to preparatory containers (e.g. init containers).
+	BenchmarkExtraArgs []string `yaml:"benchmark_extra_args,omitempty" mapstructure:"benchmark_extra_args"`
 }
 
 // ClientInstance defines a single client instance to benchmark.
@@ -789,6 +793,12 @@ type ClientInstance struct {
 	Entrypoint                       []string                          `yaml:"entrypoint,omitempty" mapstructure:"entrypoint"`
 	Command                          []string                          `yaml:"command,omitempty" mapstructure:"command"`
 	ExtraArgs                        []string                          `yaml:"extra_args,omitempty" mapstructure:"extra_args"`
+	// BenchmarkExtraArgs are appended to the client command only when the
+	// client container is started for the benchmark phase. They are NOT
+	// applied to preparatory containers (e.g. init containers). When set
+	// on an instance, this fully replaces any value from
+	// runner.client.config.benchmark_extra_args.
+	BenchmarkExtraArgs               []string                          `yaml:"benchmark_extra_args,omitempty" mapstructure:"benchmark_extra_args"`
 	PullPolicy                       string                            `yaml:"pull_policy,omitempty" mapstructure:"pull_policy"`
 	Restart                          string                            `yaml:"restart,omitempty" mapstructure:"restart"`
 	Environment                      map[string]string                 `yaml:"environment,omitempty" mapstructure:"environment"`
@@ -1699,6 +1709,22 @@ func (c *Config) GetBootstrapFCU(instance *ClientInstance) *BootstrapFCUConfig {
 	}
 
 	return c.Runner.Client.Config.BootstrapFCU
+}
+
+// GetBenchmarkExtraArgs returns the benchmark-only extra args for an instance.
+// These are appended to the client command only when the client container is
+// started for the benchmark phase; they are NOT applied to preparatory
+// containers (e.g. init containers).
+//
+// Instance-level config (when non-empty) fully replaces the global default
+// from runner.client.config.benchmark_extra_args. Returns nil when not
+// configured at either level.
+func (c *Config) GetBenchmarkExtraArgs(instance *ClientInstance) []string {
+	if len(instance.BenchmarkExtraArgs) > 0 {
+		return instance.BenchmarkExtraArgs
+	}
+
+	return c.Runner.Client.Config.BenchmarkExtraArgs
 }
 
 // GetOpcodeExtraction returns the opcode-extraction config for an instance.

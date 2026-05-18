@@ -1110,6 +1110,7 @@ runner:
 | `entrypoint` | []string | No | Client default | Override container entrypoint |
 | `command` | []string | No | Client default | Override container command |
 | `extra_args` | []string | No | - | Additional arguments appended to command |
+| `benchmark_extra_args` | []string | No | From `runner.client.config` | Additional arguments appended to command **only when the client runs the benchmark**. Not applied to preparatory containers (e.g. init containers). Applied after `extra_args`, so it takes precedence on conflicting `--flag=` keys. Instance-level value replaces the global default. |
 | `restart` | string | No | - | Container restart policy |
 | `environment` | map | No | - | Additional environment variables |
 | `genesis` | string | No | From `runner.client.config.genesis` | Override genesis file URL |
@@ -1126,6 +1127,47 @@ runner:
 | `post_test_sleep_duration` | string | No | From `runner.client.config` | Instance-specific post-test sleep duration |
 | `bootstrap_fcu` | bool/object | No | From `runner.client.config` | Instance-specific bootstrap FCU setting |
 | `opcode_extraction` | object | No | From `runner.client.config` | Instance-specific opcode extraction setting (replaces global) |
+
+### Benchmark-Only Client Flags
+
+`benchmark_extra_args` lets you specify client flags that should be passed to
+the client **only when it is running the benchmark**, not during any
+preparatory work (such as the init container some clients use to populate the
+data directory from a genesis file).
+
+This matters whenever a flag would be harmful, misleading, or simply wasted
+during preparation — for example, profiling/tracing flags whose output you
+only want for the benchmark run itself, log-verbosity flags you want elevated
+for the benchmark but not for one-off init steps, or feature toggles that
+should only apply to test traffic.
+
+`benchmark_extra_args` is appended to the command **after** `extra_args`, so
+if the same `--flag=` key is set in both, `benchmark_extra_args` wins. Plain
+flags without `=` (e.g. `--pprof`) are appended as-is and never evict a base
+arg.
+
+It can be set globally and overridden per instance — an instance-level value
+fully replaces the global default rather than merging with it:
+
+```yaml
+runner:
+  client:
+    config:
+      benchmark_extra_args:
+        - --pprof
+        - --metrics
+  instances:
+    - id: geth-default-bench-args
+      client: geth
+      # Inherits --pprof and --metrics for the benchmark phase only.
+
+    - id: geth-cpu-profile
+      client: geth
+      benchmark_extra_args:
+        - --pprof
+        - --pprof.cpuprofile=/tmp/cpu.prof
+      # Replaces the global default with this instance-specific list.
+```
 
 ## Resource Limits
 

@@ -108,6 +108,12 @@ export function ConfigDiff({ runs, labelMode }: ConfigDiffProps) {
               {instances.some((i) => i.extra_args) && (
                 <DiffRow label="Extra Args" values={instances.map((i) => i.extra_args?.join(' ') ?? '')} />
               )}
+              {instances.some((i) => i.benchmark_extra_args) && (
+                <DiffRow
+                  label="Benchmark-Only Extra Args"
+                  values={instances.map((i) => i.benchmark_extra_args?.join(' ') ?? '')}
+                />
+              )}
               {instances.some((i) => i.rollback_strategy) && (
                 <DiffRow label="Rollback Strategy" values={instances.map((i) => i.rollback_strategy ?? 'none')} />
               )}

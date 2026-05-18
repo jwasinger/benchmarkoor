@@ -171,6 +171,18 @@ export function RunConfiguration({ instance, system, startBlock, metadata, bench
                 </div>
               )}
 
+              {instance.benchmark_extra_args && instance.benchmark_extra_args.length > 0 && (
+                <div>
+                  <dt className="flex items-center gap-2 text-xs/5 font-medium text-gray-500 dark:text-gray-400">
+                    Benchmark-Only Extra Arguments
+                    <CopyButton text={instance.benchmark_extra_args.join(' ')} />
+                  </dt>
+                  <dd className="mt-1 overflow-x-auto rounded-sm bg-gray-100 p-2 font-mono text-xs/5 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+                    {instance.benchmark_extra_args.join(' ')}
+                  </dd>
+                </div>
+              )}
+
               {instance.environment && Object.keys(instance.environment).length > 0 && (
                 <div>
                   <dt className="text-xs/5 font-medium text-gray-500 dark:text-gray-400">

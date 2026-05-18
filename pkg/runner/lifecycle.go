@@ -361,37 +361,14 @@ func (r *runner) runContainerLifecycle(
 	}
 
 	// Append extra args if provided, replacing any base args that share a flag prefix.
-	if len(instance.ExtraArgs) > 0 {
-		// Build set of flag prefixes from extra_args (e.g. "--config=" from "--config=mainnet.cfg").
-		prefixes := make([]string, 0, len(instance.ExtraArgs))
-		for _, arg := range instance.ExtraArgs {
-			if idx := strings.Index(arg, "="); idx != -1 {
-				prefixes = append(prefixes, arg[:idx+1])
-			}
-		}
+	cmd = applyArgsOverride(cmd, instance.ExtraArgs)
 
-		// Remove any existing args that share a prefix with an extra arg.
-		if len(prefixes) > 0 {
-			filtered := make([]string, 0, len(cmd))
-			for _, c := range cmd {
-				override := false
-				for _, p := range prefixes {
-					if strings.HasPrefix(c, p) {
-						override = true
-
-						break
-					}
-				}
-
-				if !override {
-					filtered = append(filtered, c)
-				}
-			}
-
-			cmd = filtered
-		}
-
-		cmd = append(cmd, instance.ExtraArgs...)
+	// Append benchmark-only extra args last so they take precedence over both
+	// the base command and any extra_args. These flags are applied only to
+	// the benchmark container — they are NOT used for preparatory containers
+	// such as the init container above (which uses spec.InitCommand() only).
+	if r.cfg.FullConfig != nil {
+		cmd = applyArgsOverride(cmd, r.cfg.FullConfig.GetBenchmarkExtraArgs(instance))
 	}
 
 	// Build environment (default first, instance overrides).
@@ -579,6 +556,12 @@ func (r *runner) runContainerLifecycle(
 			Entrypoint:  instance.Entrypoint,
 			Command:     cmd,
 			ExtraArgs:   instance.ExtraArgs,
+			BenchmarkExtraArgs: func() []string {
+				if r.cfg.FullConfig != nil {
+					return r.cfg.FullConfig.GetBenchmarkExtraArgs(instance)
+				}
+				return nil
+			}(),
 			PullPolicy:  instance.PullPolicy,
 			Restart:     instance.Restart,
 			Environment: env,
@@ -1373,4 +1356,48 @@ func writeRunConfig(resultsDir string, cfg *RunConfig, owner *fsutil.OwnerConfig
 	}
 
 	return nil
+}
+
+// applyArgsOverride appends args to cmd, first removing any element of cmd
+// that shares a "--flag=" prefix with an entry in args. This lets a later
+// arg source (e.g. extra_args, benchmark_extra_args) override an earlier
+// one without producing duplicate flags. Args without an "=" don't generate
+// a prefix, so they are simply appended.
+func applyArgsOverride(cmd, args []string) []string {
+	if len(args) == 0 {
+		return cmd
+	}
+
+	// Build the set of flag prefixes that should evict matching base args
+	// (e.g. "--config=" from "--config=mainnet.cfg").
+	prefixes := make([]string, 0, len(args))
+	for _, arg := range args {
+		if idx := strings.Index(arg, "="); idx != -1 {
+			prefixes = append(prefixes, arg[:idx+1])
+		}
+	}
+
+	if len(prefixes) > 0 {
+		filtered := make([]string, 0, len(cmd))
+
+		for _, c := range cmd {
+			override := false
+
+			for _, p := range prefixes {
+				if strings.HasPrefix(c, p) {
+					override = true
+
+					break
+				}
+			}
+
+			if !override {
+				filtered = append(filtered, c)
+			}
+		}
+
+		cmd = filtered
+	}
+
+	return append(cmd, args...)
 }

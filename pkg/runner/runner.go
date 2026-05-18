@@ -171,6 +171,7 @@ type ResolvedInstance struct {
 	Entrypoint                       []string                                 `json:"entrypoint,omitempty"`
 	Command                          []string                                 `json:"command,omitempty"`
 	ExtraArgs                        []string                                 `json:"extra_args,omitempty"`
+	BenchmarkExtraArgs               []string                                 `json:"benchmark_extra_args,omitempty"`
 	PullPolicy                       string                                   `json:"pull_policy"`
 	Restart                          string                                   `json:"restart,omitempty"`
 	Environment                      map[string]string                        `json:"environment,omitempty"`

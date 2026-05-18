@@ -2949,3 +2949,124 @@ func TestValidateOpcodeExtraction(t *testing.T) {
 		})
 	}
 }
+func TestGetBenchmarkExtraArgs(t *testing.T) {
+	tests := []struct {
+		name     string
+		global   []string
+		instance []string
+		expected []string
+	}{
+		{
+			name:     "both empty returns nil",
+			global:   nil,
+			instance: nil,
+			expected: nil,
+		},
+		{
+			name:     "global set, instance empty inherits global",
+			global:   []string{"--profile=cpu", "--metrics-extended"},
+			instance: nil,
+			expected: []string{"--profile=cpu", "--metrics-extended"},
+		},
+		{
+			name:     "instance set, global empty uses instance",
+			global:   nil,
+			instance: []string{"--miner.gaslimit=1000000000"},
+			expected: []string{"--miner.gaslimit=1000000000"},
+		},
+		{
+			name:     "instance fully replaces global",
+			global:   []string{"--profile=cpu"},
+			instance: []string{"--profile=mem", "--verbosity=5"},
+			expected: []string{"--profile=mem", "--verbosity=5"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{
+				Runner: RunnerConfig{
+					Client: ClientConfig{
+						Config: ClientDefaults{
+							BenchmarkExtraArgs: tt.global,
+						},
+					},
+				},
+			}
+			instance := &ClientInstance{
+				BenchmarkExtraArgs: tt.instance,
+			}
+			result := cfg.GetBenchmarkExtraArgs(instance)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestLoad_BenchmarkExtraArgs(t *testing.T) {
+	t.Run("instance only", func(t *testing.T) {
+		configContent := `
+runner:
+  container_network: test-network
+  client:
+    config:
+      jwt: test-jwt
+      genesis:
+        geth: http://example.com/genesis.json
+  instances:
+    - id: geth-bench
+      client: geth
+      benchmark_extra_args:
+        - --profile=cpu
+        - --metrics-port=6060
+`
+		tmpDir := t.TempDir()
+		configPath := filepath.Join(tmpDir, "config.yaml")
+		require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o644))
+
+		cfg, err := Load(configPath)
+		require.NoError(t, err)
+		require.Len(t, cfg.Runner.Instances, 1)
+
+		args := cfg.GetBenchmarkExtraArgs(&cfg.Runner.Instances[0])
+		assert.Equal(t, []string{"--profile=cpu", "--metrics-port=6060"}, args)
+	})
+
+	t.Run("global default with instance override", func(t *testing.T) {
+		configContent := `
+runner:
+  container_network: test-network
+  client:
+    config:
+      jwt: test-jwt
+      genesis:
+        geth: http://example.com/genesis.json
+      benchmark_extra_args:
+        - --profile=cpu
+  instances:
+    - id: geth-with-override
+      client: geth
+      benchmark_extra_args:
+        - --profile=mem
+    - id: geth-inherits
+      client: geth
+`
+		tmpDir := t.TempDir()
+		configPath := filepath.Join(tmpDir, "config.yaml")
+		require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o644))
+
+		cfg, err := Load(configPath)
+		require.NoError(t, err)
+		require.Len(t, cfg.Runner.Instances, 2)
+
+		// Instance override wins.
+		assert.Equal(t,
+			[]string{"--profile=mem"},
+			cfg.GetBenchmarkExtraArgs(&cfg.Runner.Instances[0]),
+		)
+		// Instance with no override inherits the global default.
+		assert.Equal(t,
+			[]string{"--profile=cpu"},
+			cfg.GetBenchmarkExtraArgs(&cfg.Runner.Instances[1]),
+		)
+	})
+}

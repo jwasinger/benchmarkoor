@@ -506,6 +506,12 @@ runner:
       # command: []
       # extra_args:  # Additional arguments appended to command
       #   - --verbosity=5
+      # benchmark_extra_args:  # Like extra_args, but applied ONLY to the
+      #                        # benchmark container — never to preparatory
+      #                        # containers (e.g. init). Applied after
+      #                        # extra_args, so --flag= keys here win.
+      #   - --pprof
+      #   - --pprof.cpuprofile=/tmp/cpu.prof
       # restart: never
       # environment:
       #   SOME_VAR: ${MY_ENV_VAR}
