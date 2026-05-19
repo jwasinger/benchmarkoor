@@ -336,6 +336,10 @@ func (r *runner) runTestsWithContainerStrategy(
 
 			// Create a new container using the same mount path.
 			newSpec := *params.ContainerSpec
+
+			// TODO: check that it's geth, and pprof traces were requested first
+			newSpec.Command = append(newSpec.Command, "--pprof.cpuprofile", "/cpuprofile.profile")
+
 			newSpec.Name = fmt.Sprintf("%s-%d", params.ContainerSpec.Name, i)
 			newSpec.Mounts = make(
 				[]docker.Mount, len(params.ContainerSpec.Mounts),
@@ -819,6 +823,9 @@ func (r *runner) runTestsWithContainerStrategy(
 					"Failed to stop container after death/interruption",
 				)
 			}
+
+			// TODO: if geth and we are collecting pprof traces, copy the trace
+			// from the stopped container to the host machine at the tmpdir
 
 			stopCancel()
 
