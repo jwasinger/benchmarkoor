@@ -414,7 +414,7 @@ func (e *executor) RunPreRunSteps(ctx context.Context, opts *ExecuteOptions) (in
 
 func (e *executor) CopyPprofTraces(ctx context.Context, log *logrus.Entry, opts *ExecuteOptions, testName string) {
 	// TODO this only works for geth runs. put it into its own function and only activate if configured.
-	pprofSrcDir := "/cpuprofile.trace"
+	pprofSrcDir := "/cpuprofile.profile"
 	pprofDir := "./pprof_traces"
 	pprofTargetFile := fmt.Sprintf("./pprof_traces/%s_cpu.profile", testName)
 	err := os.MkdirAll(pprofDir, 0755)
@@ -424,11 +424,11 @@ func (e *executor) CopyPprofTraces(ctx context.Context, log *logrus.Entry, opts 
 	}
 
 	reader, _, err := opts.DockerClient.CopyFromContainer(ctx, opts.ContainerID, pprofSrcDir)
-	defer reader.Close()
 	if err != nil {
 		log.WithError(err).Warn("failed to copy pprof trace from container")
 		return
 	}
+	defer reader.Close()
 
 	tr := tar.NewReader(reader)
 	_, err = tr.Next()
