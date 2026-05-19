@@ -824,9 +824,6 @@ func (r *runner) runTestsWithContainerStrategy(
 				)
 			}
 
-			// TODO: if geth and we are collecting pprof traces, copy the trace
-			// from the stopped container to the host machine at the tmpdir
-
 			stopCancel()
 
 			log.WithField("duration", time.Since(stopStart)).Info(
