@@ -680,16 +680,17 @@ func (e *executor) ExecuteTests(ctx context.Context, opts *ExecuteOptions) (*Exe
 				err := os.MkdirAll(pprofDir, 0755)
 				if err != nil {
 					log.WithError(err).Warn("Failed to create pprof output dir")
-				}
-
-				reader, _, err := opts.DockerClient.CopyFromContainer(ctx, opts.ContainerID, pprofSrcDir)
-				defer reader.Close()
-				if err != nil {
-					log.WithError(err).Warn("failed to copy pprof trace from container")
 					goto writeStepResults
 				}
 
 				{
+					reader, _, err := opts.DockerClient.CopyFromContainer(ctx, opts.ContainerID, pprofSrcDir)
+					defer reader.Close()
+					if err != nil {
+						log.WithError(err).Warn("failed to copy pprof trace from container")
+						goto writeStepResults
+					}
+
 					tr := tar.NewReader(reader)
 					_, err = tr.Next()
 					if err != nil {
