@@ -51,11 +51,12 @@ func (r *runner) CopyPprofTraces(ctx context.Context, log *logrus.Entry, contain
 	}
 	defer out.Close()
 
-	_, err = io.Copy(out, tr)
+	written, err := io.Copy(out, tr)
 	if err != nil {
 		log.WithError(err).Warn("failed to create pprof trace target file on host machine")
 		return
 	}
+	log.Info("wrote %d pprof bytes\n", written)
 }
 
 // runTestsWithContainerStrategy executes tests one at a time, manipulating
