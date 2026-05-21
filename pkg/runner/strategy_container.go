@@ -279,9 +279,16 @@ func (r *runner) runTestsWithContainerStrategy(
 			testLog.Info("Rolling back ZFS snapshot for next test")
 
 			if i > 0 {
+
+				testLog.Info("attempting to gracefully stop container")
+
+				timeout := 30
+				if err := r.containerMgr.StopContainer(ctx, currentContainerID, &timeout); err != nil {
+					testLog.Warn("failed to stop container: %v\n", err)
+				}
 				// Force-remove container from previous test (no graceful
 				// stop needed — ZFS rollback discards the datadir anyway).
-				testLog.Info("Force-removing container before ZFS rollback")
+				testLog.Info("removing stopped container before ZFS rollback")
 
 				rmStart := time.Now()
 
