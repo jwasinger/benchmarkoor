@@ -264,8 +264,9 @@ func (r *runner) runTestsWithContainerStrategy(
 
 			stopStart := time.Now()
 
+			timeout := 30
 			if err := r.containerMgr.StopContainer(
-				stopCtx, currentContainerID, nil,
+				stopCtx, currentContainerID, &timeout,
 			); err != nil {
 				log.WithError(err).Debug(
 					"Failed to stop container on cancellation",
@@ -318,16 +319,6 @@ func (r *runner) runTestsWithContainerStrategy(
 			// ZFS snapshot path: rollback datadir, create a fresh
 			// container on the same mount, start, wait for RPC.
 			testLog.Info("Rolling back ZFS snapshot for next test")
-
-			testLog.Info("attempting to gracefully stop container")
-
-			timeout := 30
-			if err := r.containerMgr.StopContainer(ctx, currentContainerID, &timeout); err != nil {
-				testLog.Warn("failed to stop container: %v\n", err)
-			}
-
-			testLog.Info("copying pprof trace to host")
-			r.CopyPprofTraces(ctx, testLog, currentContainerID, test.Name)
 
 			if i > 0 {
 				// Force-remove container from previous test (no graceful
@@ -843,6 +834,16 @@ func (r *runner) runTestsWithContainerStrategy(
 
 			continue
 		}
+
+		testLog.Info("attempting to gracefully stop container")
+
+		timeout := 30
+		if err := r.containerMgr.StopContainer(ctx, currentContainerID, &timeout); err != nil {
+			testLog.Warn("failed to stop container", "error", err)
+		}
+
+		testLog.Info("copying pprof trace to host")
+		r.CopyPprofTraces(ctx, testLog, currentContainerID, test.Name)
 
 		// Aggregate results.
 		combined.TotalTests += result.TotalTests
