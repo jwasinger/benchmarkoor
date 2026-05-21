@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"archive/tar"
 	"context"
 	"fmt"
 	"io"
@@ -17,6 +18,46 @@ import (
 	"github.com/ethpandaops/benchmarkoor/pkg/fsutil"
 	"github.com/sirupsen/logrus"
 )
+
+func (r *runner) CopyPprofTraces(ctx context.Context, log *logrus.Entry, containerID string, testName string) {
+	// TODO this only works for geth runs. put it into its own function and only activate if configured.
+	pprofSrcDir := "/cpuprofile.profile"
+	pprofDir := "./pprof_traces"
+	pprofTargetFile := fmt.Sprintf("./pprof_traces/%s_cpu.profile", testName)
+	err := os.MkdirAll(pprofDir, 0755)
+	if err != nil {
+		log.WithError(err).Warn("Failed to create pprof output dir")
+		return
+	}
+
+	reader, _, err := r.getDockerClient().CopyFromContainer(ctx, containerID, pprofSrcDir)
+	if err != nil {
+		log.WithError(err).Warn("failed to copy pprof trace from container")
+		return
+	}
+	defer reader.Close()
+
+	tr := tar.NewReader(reader)
+	_, err = tr.Next()
+	if err != nil {
+		log.WithError(err).Warn("failed to read pprof trace from tar reader")
+		return
+	}
+
+	out, err := os.Create(pprofTargetFile)
+	if err != nil {
+		log.WithError(err).Warn("failed to create pprof trace target file on host machine")
+		return
+	}
+	defer out.Close()
+
+	written, err := io.Copy(out, tr)
+	if err != nil {
+		log.WithError(err).Warn("failed to create pprof trace target file on host machine")
+		return
+	}
+	log.Info("wrote %d pprof bytes\n", written)
+}
 
 // runTestsWithContainerStrategy executes tests one at a time, manipulating
 // the container between tests according to the given strategy.
@@ -223,8 +264,9 @@ func (r *runner) runTestsWithContainerStrategy(
 
 			stopStart := time.Now()
 
+			timeout := 30
 			if err := r.containerMgr.StopContainer(
-				stopCtx, currentContainerID, nil,
+				stopCtx, currentContainerID, &timeout,
 			); err != nil {
 				log.WithError(err).Debug(
 					"Failed to stop container on cancellation",
@@ -281,7 +323,7 @@ func (r *runner) runTestsWithContainerStrategy(
 			if i > 0 {
 				// Force-remove container from previous test (no graceful
 				// stop needed — ZFS rollback discards the datadir anyway).
-				testLog.Info("Force-removing container before ZFS rollback")
+				testLog.Info("removing stopped container before ZFS rollback")
 
 				rmStart := time.Now()
 
@@ -336,6 +378,10 @@ func (r *runner) runTestsWithContainerStrategy(
 
 			// Create a new container using the same mount path.
 			newSpec := *params.ContainerSpec
+
+			// TODO: check that it's geth, and pprof traces were requested first
+			newSpec.Command = append(newSpec.Command, "--pprof.cpuprofile", "/cpuprofile.profile")
+
 			newSpec.Name = fmt.Sprintf("%s-%d", params.ContainerSpec.Name, i)
 			newSpec.Mounts = make(
 				[]docker.Mount, len(params.ContainerSpec.Mounts),
@@ -788,6 +834,16 @@ func (r *runner) runTestsWithContainerStrategy(
 
 			continue
 		}
+
+		testLog.Info("attempting to gracefully stop container")
+
+		timeout := 30
+		if err := r.containerMgr.StopContainer(ctx, currentContainerID, &timeout); err != nil {
+			testLog.Warn("failed to stop container", "error", err)
+		}
+
+		testLog.Info("copying pprof trace to host")
+		r.CopyPprofTraces(ctx, testLog, currentContainerID, test.Name)
 
 		// Aggregate results.
 		combined.TotalTests += result.TotalTests

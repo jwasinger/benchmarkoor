@@ -678,6 +678,7 @@ func (e *executor) ExecuteTests(ctx context.Context, opts *ExecuteOptions) (*Exe
 				}
 			}
 		}
+		//e.CopyPprofTraces(ctx, log, opts, test.Name)
 
 		// Rollback to captured block after test completes.
 		if rollbackInfo != nil && opts.ClientRPCRollbackSpec != nil && opts.RPCEndpoint != "" {
