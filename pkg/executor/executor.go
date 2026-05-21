@@ -1,7 +1,6 @@
 package executor
 
 import (
-	"archive/tar"
 	"bufio"
 	"bytes"
 	"context"
@@ -412,45 +411,6 @@ func (e *executor) RunPreRunSteps(ctx context.Context, opts *ExecuteOptions) (in
 	return len(e.prepared.PreRunSteps), nil
 }
 
-func (e *executor) CopyPprofTraces(ctx context.Context, log *logrus.Entry, opts *ExecuteOptions, testName string) {
-	// TODO this only works for geth runs. put it into its own function and only activate if configured.
-	pprofSrcDir := "/cpuprofile.profile"
-	pprofDir := "./pprof_traces"
-	pprofTargetFile := fmt.Sprintf("./pprof_traces/%s_cpu.profile", testName)
-	err := os.MkdirAll(pprofDir, 0755)
-	if err != nil {
-		log.WithError(err).Warn("Failed to create pprof output dir")
-		return
-	}
-
-	reader, _, err := opts.DockerClient.CopyFromContainer(ctx, opts.ContainerID, pprofSrcDir)
-	if err != nil {
-		log.WithError(err).Warn("failed to copy pprof trace from container")
-		return
-	}
-	defer reader.Close()
-
-	tr := tar.NewReader(reader)
-	_, err = tr.Next()
-	if err != nil {
-		log.WithError(err).Warn("failed to read pprof trace from tar reader")
-		return
-	}
-
-	out, err := os.Create(pprofTargetFile)
-	if err != nil {
-		log.WithError(err).Warn("failed to create pprof trace target file on host machine")
-		return
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, tr)
-	if err != nil {
-		log.WithError(err).Warn("failed to create pprof trace target file on host machine")
-		return
-	}
-}
-
 // ExecuteTests runs all tests against the specified Engine API endpoint.
 // If the context is cancelled (e.g., due to container death), execution stops
 // but partial results are still written.
@@ -718,7 +678,7 @@ func (e *executor) ExecuteTests(ctx context.Context, opts *ExecuteOptions) (*Exe
 				}
 			}
 		}
-		e.CopyPprofTraces(ctx, log, opts, test.Name)
+		//e.CopyPprofTraces(ctx, log, opts, test.Name)
 
 		// Rollback to captured block after test completes.
 		if rollbackInfo != nil && opts.ClientRPCRollbackSpec != nil && opts.RPCEndpoint != "" {
