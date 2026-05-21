@@ -318,18 +318,17 @@ func (r *runner) runTestsWithContainerStrategy(
 			// container on the same mount, start, wait for RPC.
 			testLog.Info("Rolling back ZFS snapshot for next test")
 
+			testLog.Info("attempting to gracefully stop container")
+
+			timeout := 30
+			if err := r.containerMgr.StopContainer(ctx, currentContainerID, &timeout); err != nil {
+				testLog.Warn("failed to stop container: %v\n", err)
+			}
+
+			testLog.Info("copying pprof trace to host")
+			r.CopyPprofTraces(ctx, testLog, currentContainerID, test.Name)
+
 			if i > 0 {
-
-				testLog.Info("attempting to gracefully stop container")
-
-				timeout := 30
-				if err := r.containerMgr.StopContainer(ctx, currentContainerID, &timeout); err != nil {
-					testLog.Warn("failed to stop container: %v\n", err)
-				}
-
-				testLog.Info("copying pprof trace to host")
-				r.CopyPprofTraces(ctx, testLog, currentContainerID, test.Name)
-
 				// Force-remove container from previous test (no graceful
 				// stop needed — ZFS rollback discards the datadir anyway).
 				testLog.Info("removing stopped container before ZFS rollback")
